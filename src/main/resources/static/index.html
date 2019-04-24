@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title></title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="bootstrap-table/bootstrap-table.min.css"/>
+    <link href="bootstrap-datetimepicker-master/css/bootstrap-datetimepicker.css" rel="stylesheet" media="screen">
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/css/bootstrap-select.min.css">
+    <link href="open-iconic-master/font/css/open-iconic-bootstrap.min.css">
+    <style>
+        .bootstrap-select:not(.input-group-btn) {
+            float: left;
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row" style="padding: 1rem 0 0.1rem 0;">
+        <select id="selectId" class="selectpicker" style="padding: 5rem;float: left;" data-live-search="true">
+        </select>
+        <div class="input-group ">
+            <input type="text" class="form-control" style="max-width: 250px;" id="startTime"/>
+
+            <span class="input-group-addon">-</span>
+            <input type="text" class="form-control" style="max-width: 250px;" id="endTime"/>
+            <span class="input-group-btn" style="width: auto;">
+						<button type="button" class="btn btn-success" onclick="searchByTimeAndProductId()">搜索</button>
+					</span>
+        </div>
+    </div>
+    <div class="divider"></div>
+    <hr class="simple" color="#ADADAD"/>
+    <div class="row">
+        <div class="col-md-6 col-lg-6">
+            <table id="statusList" style="width:100%"></table>
+        </div>
+        <div class="col-md-6 col-lg-6">
+            <table id="changeList" style="width:100%"></table>
+        </div>
+    </div>
+</div>
+<script src="js/jquery-3.4.0.min.js"></script>
+<script src="https://cdn.bootcss.com/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="bootstrap-table/bootstrap-table.min.js"></script>
+<script src="bootstrap-table/extensions/export/bootstrap-table-export.js"></script>
+<script src="bootstrap-table/locale/bootstrap-table-zh-CN.js"></script>
+<script src="bootstrap-datetimepicker-master/js/bootstrap-datetimepicker.min.js"></script>
+<script src="bootstrap-datetimepicker-master/js/locales/bootstrap-datetimepicker.zh-CN.js"></script>
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/js/bootstrap-select.min.js"></script>
+
+<!-- (Optional) Latest compiled and minified JavaScript translation files -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/js/i18n/defaults-zh_CN.min.js"></script>
+<script src="js/FileSaver.min.js"></script>
+<script src="js/tableExport.min.js"></script>
+<script>
+    $(function () {
+        $('#startTime').datetimepicker({
+            'autoclose': true,
+            'language': 'zh-CN',
+        });
+        $('#endTime').datetimepicker({
+            'autoclose': true,
+            'language': 'zh-CN',
+        });
+        // 初始化产品id
+        $.get("/mqtt/getTxtFileName", function (productIds) {
+            if (!$.isArray(productIds)) {
+                return;
+            }
+            for (index in productIds) {
+                $("#selectId").append("<option value='" + productIds[index] + "'>" + productIds[index] + "</option>");
+            }
+            $("#selectId").selectpicker("refresh");
+        });
+        $('#statusList').bootstrapTable({
+            url: '/mqtt/getContentByIdAndTime',
+            method: 'post',                      //请求方式（*）
+            toolbar: '',                        //工具按钮用哪个容器
+            striped: true,                      //是否显示行间隔色
+            cache: false,                       //是否使用缓存，默认为true，所以一般情况下需要设置一下这个属性（*）
+            pagination: true,                   //是否显示分页（*）
+            sortable: true,                     //是否启用排序
+            sortOrder: "asc",                   //排序方式
+            queryParams: {},//传递参数（*）
+            sidePagination: "client",           //分页方式：client客户端分页，server服务端分页（*）
+            pageNumber: 1,                       //初始化加载第一页，默认第一页
+            pageSize: 10,                       //每页的记录行数（*）
+            pageList: [10, 25, 50, 100],        //可供选择的每页的行数（*）
+            search: true,                       //是否显示表格搜索，此搜索是客户端搜索，不会进服务端，所以，个人感觉意义不大
+            strictSearch: false,
+            showColumns: false,                  //是否显示所有的列
+            showRefresh: false,                  //是否显示刷新按钮
+            minimumCountColumns: 2,             //最少允许的列数
+            clickToSelect: true,                //是否启用点击选中行
+            height: 500,                        //行高，如果没有设置height属性，表格自动根据记录条数觉得表格高度
+            uniqueId: "ID",                     //每一行的唯一标识，一般为主键列
+            showToggle: false,                    //是否显示详细视图和列表视图的切换按钮
+            cardView: false,                    //是否显示详细视图
+            detailView: false,                   //是否显示父子表
+            columns: [{
+                field: 'productId',
+                title: '设备ID',
+                sortable: true
+            }, {
+                field: 'time',
+                title: '时间',
+                sortable: true,
+            }, {
+                field: 'status',
+                title: '状态',
+                sortable: true,
+            }],
+            showExport: true,              //是否显示导出按钮(此方法是自己写的目的是判断终端是电脑还是手机,电脑则返回true,手机返回falsee,手机不显示按钮)
+            exportDataType: "all",              //basic', 'all', 'selected'.
+            exportTypes: ['excel', 'xlsx'],	    //导出类型
+            exportOptions: {
+                fileName: $("#selectId").val() + '所有数据',              //文件名称设置
+                worksheetName: 'Sheet1',          //表格工作区名称
+                tableName: '商品数据表',
+                excelstyles: ['background-color', 'color', 'font-size', 'font-weight'],
+            }
+        });
+        $('#changeList').bootstrapTable({
+            url: '/mqtt/getDifftimeByIdAndTime',
+            method: 'post',                      //请求方式（*）
+            toolbar: '',                //工具按钮用哪个容器
+            striped: true,                      //是否显示行间隔色
+            cache: false,                       //是否使用缓存，默认为true，所以一般情况下需要设置一下这个属性（*）
+            pagination: true,                   //是否显示分页（*）
+            sortable: true,                     //是否启用排序
+            sortOrder: "asc",                   //排序方式
+            queryParams: {},//传递参数（*）
+            sidePagination: "client",           //分页方式：client客户端分页，server服务端分页（*）
+            pageNumber: 1,                       //初始化加载第一页，默认第一页
+            pageSize: 10,                       //每页的记录行数（*）
+            pageList: [10, 25, 50, 100],        //可供选择的每页的行数（*）
+            search: true,                       //是否显示表格搜索，此搜索是客户端搜索，不会进服务端，所以，个人感觉意义不大
+            strictSearch: false,
+            showColumns: false,                  //是否显示所有的列
+            showRefresh: false,                  //是否显示刷新按钮
+            minimumCountColumns: 2,             //最少允许的列数
+            clickToSelect: true,                //是否启用点击选中行
+            height: 500,                        //行高，如果没有设置height属性，表格自动根据记录条数觉得表格高度
+            uniqueId: "ID",                     //每一行的唯一标识，一般为主键列
+            showToggle: false,                    //是否显示详细视图和列表视图的切换按钮
+            cardView: false,                    //是否显示详细视图
+            detailView: false,                   //是否显示父子表
+            columns: [{
+                field: 'productId',
+                title: '设备ID'
+            }, {
+                field: 'time',
+                title: '时间',
+                sortable: true
+            }, {
+                field: 'status',
+                title: '状态',
+                sortable: true
+            }, {
+                field: 'difftime',
+                title: '时间差',
+                sortable: true
+            }],
+            showExport: true,              //是否显示导出按钮(此方法是自己写的目的是判断终端是电脑还是手机,电脑则返回true,手机返回falsee,手机不显示按钮)
+            exportDataType: "all",              //basic', 'all', 'selected'.
+            exportTypes: ['excel', 'xlsx'],	    //导出类型
+            exportOptions: {
+                fileName: $("#selectId").val() + '时间差数据',              //文件名称设置
+                worksheetName: 'Sheet1',          //表格工作区名称
+                tableName: '商品数据表',
+                excelstyles: ['background-color', 'color', 'font-size', 'font-weight'],
+            }
+        });
+        // 多个table改变浏览器大小时会出现只有最后一个table表头缩放正常,其他固定大小bug,通过这种方法修复
+        $(window).resize(function () {
+            $('#statusList').bootstrapTable('resetView');
+        })
+
+    })
+
+    function searchByTimeAndProductId() {
+        let productId = $("#selectId").val();
+        let startTime = $("#startTime").val();
+        let endTime = $("#endTime").val();
+        if (endTime < startTime) {
+            alert("截止时间不能小于开始时间");
+            return;
+        }
+        let postParams = {
+            'productId': productId,
+            'startTime': startTime,
+            'endTime': endTime
+        }
+
+        $('#statusList').bootstrapTable('refreshOptions', {
+            'queryParams': postParams
+        })
+        $('#changeList').bootstrapTable('refreshOptions', {
+            'queryParams': postParams
+        })
+    }
+</script>
+</body>
+</html>
